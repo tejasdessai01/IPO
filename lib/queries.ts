@@ -1,173 +1,113 @@
-import { getDb } from './db';
+import { ipos, gmpHistory, timelineEvents, type IPORecord, type GmpHistoryRecord, type TimelineEventRecord } from './data';
 
-export interface IPO {
-  id: string;
-  company_name: string;
-  logo_url: string | null;
-  status: string;
-  ipo_type: string;
-  open_date: string | null;
-  close_date: string | null;
-  listing_date: string | null;
-  price_band_low: number | null;
-  price_band_high: number | null;
-  face_value: number | null;
-  lot_size: number | null;
-  min_investment: number | null;
-  issue_size_cr: number | null;
-  fresh_issue_cr: number | null;
-  ofs_cr: number | null;
-  subscription_retail: number;
-  subscription_nii: number;
-  subscription_qib: number;
-  subscription_total: number;
-  gmp: number;
-  gmp_percent: number;
-  gmp_updated_at: string | null;
-  listing_price: number | null;
-  listing_gain_percent: number | null;
-  current_price: number | null;
-  industry: string | null;
-  description: string | null;
-  about: string | null;
-  business_model: string | null;
-  strengths: string | null;
-  risks: string | null;
-  financials_json: string | null;
-  promoters: string | null;
-  lead_managers: string | null;
-  registrar: string | null;
-  drhp_url: string | null;
-  rhp_url: string | null;
-  ai_summary: string | null;
-  ai_verdict: string | null;
-  ai_score: number | null;
-  allotment_date: string | null;
-  allotment_status_url: string | null;
-  source_url: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface GmpHistory {
-  id: number;
-  ipo_id: string;
-  gmp: number;
-  recorded_at: string;
-}
-
-export interface TimelineEvent {
-  id: number;
-  ipo_id: string;
-  event_type: string;
-  event_date: string;
-  label: string;
-}
+export type IPO = IPORecord;
+export type GmpHistory = GmpHistoryRecord;
+export type TimelineEvent = TimelineEventRecord;
 
 export function getAllIpos(): IPO[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM ipos ORDER BY open_date DESC').all() as IPO[];
+  return [...ipos].sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''));
 }
 
 export function getIposByStatus(status: string): IPO[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM ipos WHERE status = ? ORDER BY open_date DESC').all(status) as IPO[];
+  return ipos
+    .filter((i) => i.status === status)
+    .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''));
 }
 
 export function getIposByType(type: string): IPO[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM ipos WHERE ipo_type = ? ORDER BY open_date DESC').all(type) as IPO[];
+  return ipos
+    .filter((i) => i.ipo_type === type)
+    .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''));
 }
 
 export function getIposByTypeAndStatus(type: string, status?: string): IPO[] {
-  const db = getDb();
-  if (status) {
-    return db.prepare('SELECT * FROM ipos WHERE ipo_type = ? AND status = ? ORDER BY open_date DESC').all(type, status) as IPO[];
-  }
-  return db.prepare('SELECT * FROM ipos WHERE ipo_type = ? ORDER BY open_date DESC').all(type) as IPO[];
+  return ipos
+    .filter((i) => i.ipo_type === type && (!status || i.status === status))
+    .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''));
 }
 
 export function getIpoBySlug(slug: string): IPO | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM ipos WHERE id = ?').get(slug) as IPO | undefined;
+  return ipos.find((i) => i.id === slug);
 }
 
 export function getOpenIpos(): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status = 'open' ORDER BY close_date ASC").all() as IPO[];
+  return ipos
+    .filter((i) => i.status === 'open')
+    .sort((a, b) => (a.close_date ?? '').localeCompare(b.close_date ?? ''));
 }
 
 export function getUpcomingIpos(): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status = 'upcoming' ORDER BY open_date ASC").all() as IPO[];
+  return ipos
+    .filter((i) => i.status === 'upcoming')
+    .sort((a, b) => (a.open_date ?? '').localeCompare(b.open_date ?? ''));
 }
 
 export function getListedIpos(): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status = 'listed' ORDER BY listing_date DESC").all() as IPO[];
+  return ipos
+    .filter((i) => i.status === 'listed')
+    .sort((a, b) => (b.listing_date ?? '').localeCompare(a.listing_date ?? ''));
 }
 
 export function getClosedIpos(): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status = 'closed' ORDER BY close_date DESC").all() as IPO[];
+  return ipos
+    .filter((i) => i.status === 'closed')
+    .sort((a, b) => (b.close_date ?? '').localeCompare(a.close_date ?? ''));
 }
 
 export function getRecentIpos(limit: number = 10): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status IN ('listed', 'closed') ORDER BY listing_date DESC, close_date DESC LIMIT ?").all(limit) as IPO[];
+  return ipos
+    .filter((i) => i.status === 'listed' || i.status === 'closed')
+    .sort((a, b) => (b.listing_date ?? b.close_date ?? '').localeCompare(a.listing_date ?? a.close_date ?? ''))
+    .slice(0, limit);
 }
 
 export function getIposWithGmp(): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status IN ('upcoming', 'open', 'closed') AND gmp != 0 ORDER BY gmp_percent DESC").all() as IPO[];
+  return ipos
+    .filter((i) => ['upcoming', 'open', 'closed'].includes(i.status) && i.gmp !== 0)
+    .sort((a, b) => (b.gmp_percent ?? 0) - (a.gmp_percent ?? 0));
 }
 
 export function getAllIposForGmp(): IPO[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM ipos WHERE status IN ('upcoming', 'open', 'closed') ORDER BY open_date DESC").all() as IPO[];
+  return ipos
+    .filter((i) => ['upcoming', 'open', 'closed'].includes(i.status))
+    .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''));
 }
 
 export function getGmpHistory(ipoId: string): GmpHistory[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM gmp_history WHERE ipo_id = ? ORDER BY recorded_at ASC').all(ipoId) as GmpHistory[];
+  return gmpHistory
+    .filter((g) => g.ipo_id === ipoId)
+    .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
 }
 
 export function getTimelineEvents(ipoId: string): TimelineEvent[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM timeline_events WHERE ipo_id = ? ORDER BY event_date ASC').all(ipoId) as TimelineEvent[];
+  return timelineEvents
+    .filter((t) => t.ipo_id === ipoId)
+    .sort((a, b) => a.event_date.localeCompare(b.event_date));
 }
 
 export function getRelatedIpos(ipoId: string, industry: string | null, limit: number = 3): IPO[] {
-  const db = getDb();
-  if (industry) {
-    return db.prepare('SELECT * FROM ipos WHERE id != ? AND industry = ? ORDER BY open_date DESC LIMIT ?').all(ipoId, industry, limit) as IPO[];
-  }
-  return db.prepare('SELECT * FROM ipos WHERE id != ? ORDER BY open_date DESC LIMIT ?').all(ipoId, limit) as IPO[];
+  const filtered = industry
+    ? ipos.filter((i) => i.id !== ipoId && i.industry === industry)
+    : ipos.filter((i) => i.id !== ipoId);
+  return filtered
+    .sort((a, b) => (b.open_date ?? '').localeCompare(a.open_date ?? ''))
+    .slice(0, limit);
 }
 
 export function getCalendarEvents(): Array<{ date: string; events: Array<{ type: string; company: string; slug: string }> }> {
-  const db = getDb();
-  const ipos = db.prepare("SELECT id, company_name, open_date, close_date, allotment_date, listing_date, status FROM ipos WHERE open_date IS NOT NULL ORDER BY open_date DESC").all() as IPO[];
-
   const dateMap: Record<string, Array<{ type: string; company: string; slug: string }>> = {};
 
   for (const ipo of ipos) {
-    if (ipo.open_date) {
-      if (!dateMap[ipo.open_date]) dateMap[ipo.open_date] = [];
-      dateMap[ipo.open_date].push({ type: 'open', company: ipo.company_name, slug: ipo.id });
-    }
-    if (ipo.close_date) {
-      if (!dateMap[ipo.close_date]) dateMap[ipo.close_date] = [];
-      dateMap[ipo.close_date].push({ type: 'close', company: ipo.company_name, slug: ipo.id });
-    }
-    if (ipo.allotment_date) {
-      if (!dateMap[ipo.allotment_date]) dateMap[ipo.allotment_date] = [];
-      dateMap[ipo.allotment_date].push({ type: 'allotment', company: ipo.company_name, slug: ipo.id });
-    }
-    if (ipo.listing_date) {
-      if (!dateMap[ipo.listing_date]) dateMap[ipo.listing_date] = [];
-      dateMap[ipo.listing_date].push({ type: 'listing', company: ipo.company_name, slug: ipo.id });
-    }
+    if (!ipo.open_date) continue;
+    const addEvent = (date: string | null, type: string) => {
+      if (!date) return;
+      if (!dateMap[date]) dateMap[date] = [];
+      dateMap[date].push({ type, company: ipo.company_name, slug: ipo.id });
+    };
+    addEvent(ipo.open_date, 'open');
+    addEvent(ipo.close_date, 'close');
+    addEvent(ipo.allotment_date, 'allotment');
+    addEvent(ipo.listing_date, 'listing');
   }
 
   return Object.entries(dateMap)
@@ -176,16 +116,20 @@ export function getCalendarEvents(): Array<{ date: string; events: Array<{ type:
 }
 
 export function searchIpos(query: string): IPO[] {
-  const db = getDb();
-  const searchTerm = `%${query}%`;
-  return db.prepare('SELECT * FROM ipos WHERE company_name LIKE ? OR industry LIKE ? ORDER BY open_date DESC LIMIT 20').all(searchTerm, searchTerm) as IPO[];
+  const q = query.toLowerCase();
+  return ipos
+    .filter((i) =>
+      i.company_name.toLowerCase().includes(q) ||
+      (i.industry && i.industry.toLowerCase().includes(q))
+    )
+    .slice(0, 20);
 }
 
 export function getIpoCount(): { total: number; open: number; upcoming: number; listed: number } {
-  const db = getDb();
-  const total = (db.prepare('SELECT COUNT(*) as count FROM ipos').get() as { count: number }).count;
-  const open = (db.prepare("SELECT COUNT(*) as count FROM ipos WHERE status = 'open'").get() as { count: number }).count;
-  const upcoming = (db.prepare("SELECT COUNT(*) as count FROM ipos WHERE status = 'upcoming'").get() as { count: number }).count;
-  const listed = (db.prepare("SELECT COUNT(*) as count FROM ipos WHERE status = 'listed'").get() as { count: number }).count;
-  return { total, open, upcoming, listed };
+  return {
+    total: ipos.length,
+    open: ipos.filter((i) => i.status === 'open').length,
+    upcoming: ipos.filter((i) => i.status === 'upcoming').length,
+    listed: ipos.filter((i) => i.status === 'listed').length,
+  };
 }

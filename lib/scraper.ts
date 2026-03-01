@@ -1,5 +1,4 @@
 import * as cheerio from 'cheerio';
-import { getDb } from './db';
 
 interface ScrapedIpo {
   company_name: string;
@@ -97,38 +96,6 @@ export async function scrapeGmpData(): Promise<Array<{ company_name: string; gmp
   return results;
 }
 
-export async function updateGmpInDb(gmpData: Array<{ company_name: string; gmp: number }>) {
-  const db = getDb();
-
-  const updateStmt = db.prepare(`
-    UPDATE ipos SET gmp = ?, gmp_percent = ?, gmp_updated_at = datetime('now'), updated_at = datetime('now')
-    WHERE company_name LIKE ? AND status IN ('upcoming', 'open', 'closed')
-  `);
-
-  const insertGmpHistory = db.prepare(`
-    INSERT INTO gmp_history (ipo_id, gmp) VALUES (?, ?)
-  `);
-
-  const findIpo = db.prepare(`
-    SELECT id, price_band_high FROM ipos WHERE company_name LIKE ? AND status IN ('upcoming', 'open', 'closed')
-  `);
-
-  const transaction = db.transaction(() => {
-    for (const { company_name, gmp } of gmpData) {
-      const searchName = `%${company_name}%`;
-      const ipo = findIpo.get(searchName) as { id: string; price_band_high: number | null } | undefined;
-
-      if (ipo) {
-        const gmpPercent = ipo.price_band_high ? (gmp / ipo.price_band_high) * 100 : 0;
-        updateStmt.run(gmp, gmpPercent, searchName);
-        insertGmpHistory.run(ipo.id, gmp);
-      }
-    }
-  });
-
-  transaction();
-}
-
 export async function runScraper() {
   console.log('[Scraper] Starting IPO data scrape...');
 
@@ -138,10 +105,9 @@ export async function runScraper() {
   const gmpData = await scrapeGmpData();
   console.log(`[Scraper] Found ${gmpData.length} GMP entries`);
 
-  if (gmpData.length > 0) {
-    await updateGmpInDb(gmpData);
-    console.log('[Scraper] GMP data updated in database');
-  }
+  // Note: In serverless mode, scraped data needs to be persisted to an external database.
+  // For local development, data is served from lib/data.ts.
+  console.log('[Scraper] Data scraped. Connect a database to persist updates.');
 
   return { iposFound: ipoData.length, gmpsUpdated: gmpData.length };
 }

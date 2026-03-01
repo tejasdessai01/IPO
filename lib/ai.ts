@@ -80,34 +80,18 @@ Respond in JSON only. No markdown formatting.`;
 }
 
 export async function enrichIpoWithAi(ipoId: string) {
-  const { getDb } = await import('./db');
-  const db = getDb();
+  const { ipos } = await import('./data');
 
-  const ipo = db.prepare('SELECT * FROM ipos WHERE id = ?').get(ipoId) as IpoData & { id: string } | undefined;
+  const ipo = ipos.find((i) => i.id === ipoId);
   if (!ipo) {
     console.error(`[AI] IPO not found: ${ipoId}`);
-    return;
+    return null;
   }
 
   const analysis = await generateIpoAnalysis(ipo);
-  if (!analysis) return;
+  if (!analysis) return null;
 
-  db.prepare(`
-    UPDATE ipos SET
-      about = ?, business_model = ?, strengths = ?, risks = ?,
-      ai_summary = ?, ai_verdict = ?, ai_score = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    analysis.about,
-    analysis.business_model,
-    JSON.stringify(analysis.strengths),
-    JSON.stringify(analysis.risks),
-    analysis.ai_summary,
-    analysis.ai_verdict,
-    analysis.ai_score,
-    ipoId
-  );
-
-  console.log(`[AI] Enriched IPO: ${ipo.company_name}`);
+  // Note: In serverless mode, persist this to an external database.
+  console.log(`[AI] Generated analysis for: ${ipo.company_name}`);
+  return analysis;
 }
